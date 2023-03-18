@@ -74,7 +74,37 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  struct proc *p = myproc();
+  pagetable_t pagetable = p->pagetable;
+
+  uint64 va;  // virtual adress 
+  int num_pages; // number of pages to check
+  uint64 resultva; // virtual address of where to store result 
+
+  argaddr(0, &va);
+  argint(1, &num_pages);
+  argaddr(2, &resultva);
+
+  uint64 resultpa = walkaddr(pagetable, resultva);
+  if (resultpa == 0) panic("memory not allocated at storage address");
+  resultpa += resultva - PGROUNDDOWN(resultva);
+  char *store = (char *) resultpa;
+
+  // go through all the page table entries 
+  uint64 a = PGROUNDDOWN(va);
+  pte_t *pte;
+  for(int i = 0; i < num_pages; i++){
+    if (i%8 == 0) store[i/8] = 0; // clear this range 
+    if((pte = walk(pagetable, a, 0)) == 0)
+      return -1;
+    printf("page table entry: %p, pa: %p\n", *pte, PTE2PA(*pte));
+    if (*pte & PTE_A){
+      printf("setting access bit %d\n", i);
+      store[i/8] |=  1 << (i&0b111);
+      *pte ^= PTE_A; // clear access bit 
+    }
+    a += PGSIZE;
+  }
   return 0;
 }
 #endif

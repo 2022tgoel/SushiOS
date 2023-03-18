@@ -102,6 +102,8 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
   return &pagetable[PX(0, va)];
 }
 
+
+
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
@@ -284,6 +286,26 @@ freewalk(pagetable_t pagetable)
     }
   }
   kfree((void*)pagetable);
+}
+
+void 
+vmprintr(pagetable_t pagetable, uint8 level, int index)
+{
+  if (level == 4) return;
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V){
+      uint64 child = PTE2PA(pte);
+      for (int i = 0; i < level ;i++) printf(" ..");
+      printf("%d: pte %p pa %p\n", index, pte, child);
+      vmprintr((pagetable_t)child, level+1, i); 
+    }
+  }
+}
+
+void vmprint(pagetable_t pagetable){
+  printf("page table %p\n", pagetable);
+  vmprintr(pagetable, 1, 0);
 }
 
 // Free user memory pages,

@@ -70,6 +70,7 @@ usertrap(void)
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    printf("            PA on shared page: %p, PID: %d, USYSCALL: %p, PA: %p\n", p->sharedpage, p->sharedpage->pid, USYSCALL, ((struct usyscall *)PTE2PA(*walk(p->pagetable, USYSCALL, 0)))->pid);
     setkilled(p);
   }
 
