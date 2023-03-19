@@ -67,9 +67,26 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 15) { // write page fault - implement copy on write 
+    pte_t *pte = walk(p->pagetable, r_stval(), 0);
+    // printf("VA: %p, PA: %p, pid: %d\n", r_stval(), PTE2PA(*pte), p->pid);
+    if (*pte & PTE_COW) {
+      char *mem = kalloc();
+      if (mem == 0)
+        setkilled(p);
+      else {
+        cow(p->pagetable, PGROUNDDOWN(r_stval()), mem);
+      }
+    }
+    else {
+      printf("usertrap(): unexpected write\n");
+      setkilled(p);
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    if (r_scause() == 5) 
+      printf("            pte: %p, pa: %p\n", *walk(p->pagetable, r_stval(), 0), PTE2PA(*walk(p->pagetable, r_stval(), 0)));
     setkilled(p);
   }
 

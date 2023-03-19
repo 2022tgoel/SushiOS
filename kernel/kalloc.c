@@ -23,10 +23,14 @@ struct {
   struct run *freelist;
 } kmem;
 
+uint8 pageref[NUMPAGES]; // number of references to each page
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  // printf("resetting the reference counts\n");
+  memset((char *) pageref, 0, NUMPAGES);
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -51,6 +55,15 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
+  int pagenum = PA2PAGE(pa);
+  if (pageref[pagenum]) {
+    pageref[pagenum]--;
+    // printf("decrementing the reference count %d for page %d\n ", pageref[pagenum], pagenum);
+  }
+
+  if (pageref[PA2PAGE(pa)] >= 1) {
+    return;
+  }
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
@@ -76,7 +89,10 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r) {
     memset((char*)r, 5, PGSIZE); // fill with junk
+    pageref[PA2PAGE(r)]++;
+    // printf("incrementing the reference count %p, page num %d\n", r, PA2PAGE(r));
+  }
   return (void*)r;
 }
