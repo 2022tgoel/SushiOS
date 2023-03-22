@@ -58,6 +58,7 @@ struct {
 int
 consolewrite(int user_src, uint64 src, int n)
 {
+  // printf("write %p and %p %s\n", r_sp(), myproc()->kstack, myproc()->name);
   int i;
 
   for(i = 0; i < n; i++){
@@ -79,6 +80,7 @@ consolewrite(int user_src, uint64 src, int n)
 int
 consoleread(int user_dst, uint64 dst, int n)
 {
+  // printf("read %p and %p %s\n", r_sp(), myproc()->kstack, myproc()->name);
   uint target;
   int c;
   char cbuf;

@@ -630,6 +630,7 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 {
   struct proc *p = myproc();
   if(user_dst){
+    // printf("doing the copyout %p\n", dst);
     return copyout(p->pagetable, dst, src, len);
   } else {
     memmove((char *)dst, src, len);

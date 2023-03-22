@@ -89,9 +89,10 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 {
   if(va >= MAXVA)
     panic("walk");
-
+  if (va == 0x80000000) printf("yo\n");
   for(int level = 2; level > 0; level--) {
     pte_t *pte = &pagetable[PX(level, va)];
+    if (va == 0x80000000) printf("pte: %p\n", *pte);
     if(*pte & PTE_V) {
       pagetable = (pagetable_t)PTE2PA(*pte);
     } else {
@@ -396,12 +397,13 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
   pte_t *pte;
-
+  if (dstva == 0x80000000) printf("starting copyout %p\n", dstva);
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    pte = walk(pagetable, va0, 0);
-    if(PTE2PA(*pte) == 0)
+    pa0 = walkaddr(pagetable, va0);
+    if(pa0 == 0)
       return -1;
+    pte = walk(pagetable, va0, 0);
     if (*pte & PTE_COW){
       char *mem = kalloc();
       if (mem == 0)
@@ -414,6 +416,9 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
+    if ((pa0 + (dstva - va0)) == 0 || src == 0)
+      panic("address is zero");
+   // printf("copying into %p from %p\n", (pa0 + (dstva - va0)), src);
     memmove((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;

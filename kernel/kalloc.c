@@ -37,8 +37,10 @@ kinit()
 void
 freerange(void *pa_start, void *pa_end)
 {
+  printf("freerange %p\n", r_sp());
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
+  printf("%p\n", *((uint64 *) r_sp()));
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
     kfree(p);
 }

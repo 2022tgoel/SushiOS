@@ -36,6 +36,8 @@ trapinithart(void)
 void
 usertrap(void)
 {
+  // printf("trap %p and %p %s\n", r_sp(), myproc()->kstack, myproc()->name);
+  // printf("%p\n", *((uint64 *) r_sp()));
   int which_dev = 0;
 
   if((r_sstatus() & SSTATUS_SPP) != 0)
@@ -68,17 +70,22 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else if (r_scause() == 15) { // write page fault - implement copy on write 
-    pte_t *pte = walk(p->pagetable, r_stval(), 0);
-    // printf("VA: %p, PA: %p, pid: %d\n", r_stval(), PTE2PA(*pte), p->pid);
-    if (*pte & PTE_COW) {
-      char *mem = kalloc();
-      if (mem == 0)
-        setkilled(p);
-      else {
-        cow(p->pagetable, PGROUNDDOWN(r_stval()), mem);
+    uint64 pa = walkaddr(p->pagetable, r_stval());
+    int copied = 0;
+    if (pa != 0) {
+      pte_t *pte = walk(p->pagetable, r_stval(), 0);
+      // printf("VA: %p, PA: %p, pid: %d\n", r_stval(), PTE2PA(*pte), p->pid);
+      if (*pte & PTE_COW) {
+        char *mem = kalloc();
+        if (mem == 0)
+          setkilled(p);
+        else {
+          cow(p->pagetable, PGROUNDDOWN(r_stval()), mem);
+          copied = 1;
+        }
       }
     }
-    else {
+    if (!copied) {
       printf("usertrap(): unexpected write\n");
       setkilled(p);
     }
