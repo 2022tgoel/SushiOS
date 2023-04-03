@@ -7,7 +7,7 @@ Lab util
 - [ ] find
 - [ ] xargs
 
-Lab util
+Lab syscall
 - [ ] Using gdb
 - [ ] System call tracing
 - [ ] Sysinfo
