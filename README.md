@@ -18,9 +18,9 @@ Lab pgtbl
 - [x] Detect which pages have been accessed 
 
 Lab traps
-- [ ] RISC-V assembly
-- [ ] Backtrace
-- [ ] Alarm
+- [x] RISC-V assembly
+- [x] Backtrace
+- [x] Alarm
 
 Lab cow
 - [x] Implement copy-on-write fork
@@ -36,3 +36,10 @@ Lab networking
 Lab locks
 - [x] Memory allocator
 - [ ] Buffer cache
+
+Lab fs
+- [ ] large files
+- [ ] symbolic links
+
+Lab mmap
+- [ ] implement mmap
