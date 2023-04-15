@@ -123,6 +123,7 @@ panic(char *s)
   printf(s);
   printf("\n");
   panicked = 1; // freeze uart output from other CPUs
+  backtrace();
   for(;;)
     ;
 }
@@ -132,4 +133,24 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+static inline uint64
+r_fp()
+{
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r" (x) );
+  return x;
+}
+
+void
+backtrace(void)
+{
+  uint64 *fp = (uint64*)r_fp();
+  uint64 pgbound = PGROUNDDOWN((uint64) fp);
+  printf("backtrace:\n");
+  while (pgbound == PGROUNDDOWN((uint64) fp)){
+    printf("%p\n", *(fp-1));
+    fp = (uint64*) *(fp-2);
+  }
 }

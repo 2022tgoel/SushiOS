@@ -53,7 +53,7 @@ sys_sleep(void)
 {
   int n;
   uint ticks0;
-
+  backtrace();
   argint(0, &n);
   if(n < 0)
     n = 0;
@@ -90,4 +90,30 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64 
+sys_sigalarm(void)
+{
+  int maxticks; // number of ticks until function is called
+  uint64 addr; // address of the function that is to be called
+
+  argint(0, &maxticks);
+  argaddr(1, &addr);
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  p->func = addr;
+  p->maxticks = maxticks;
+  p->ticks = 0;
+  release(&p->lock);
+  return 0;
+}
+
+uint64
+sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+  *(p->trapframe) = *(p->oldtrapframe);
+  p->ticks = 0;
+  return p->trapframe->a0;
 }
