@@ -5,6 +5,9 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
 
 struct cpu cpus[NCPU];
 
@@ -212,7 +215,9 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  // printf("freeing\n");
   uvmfree(pagetable, sz);
+  // printf("finished freeing\n");
 }
 
 // a user program that calls exec("/init")
@@ -274,6 +279,104 @@ growproc(int n)
   return 0;
 }
 
+// Creates a vma entry that allocated n bytes. 
+// Return 0 on success, -1 on failure. 
+uint64 
+create_vma_entry(uint64 n, int perm, int fd, int writeback){
+  uint64 sz;
+  struct proc *p = myproc();
+
+  sz = PGROUNDUP(p->sz);
+  if (sz + n >= TRAPFRAME) // not enough space to mmap.
+    return -1;
+
+  // Find an available entry.
+  for (int i = 0; i < NVMA; i++) {
+    if (p->vma[i].maxaddr == 0) {  
+      // populate this entry. 
+      p->vma[i].minaddr = sz;
+      p->vma[i].offsetaddr = sz;
+      p->vma[i].maxaddr = sz + n;
+      p->vma[i].perm = perm;
+      p->vma[i].file = p->ofile[fd];
+      p->vma[i].writeback = writeback;
+      filedup(p->ofile[fd]);
+      p->sz = PGROUNDUP(sz + n); // don't want the pages to be allocated normally (must happen through a page fault)
+      printf("created vma entry: %p %p\n", p->vma[i].minaddr, p->vma[i].maxaddr);
+      return sz;
+    }
+  }
+  return -1;
+}
+
+int
+munmap(uint64 addr, uint64 length) {
+  struct proc *p = myproc();
+
+  int vma_ind = -1;
+  // Update the VMA.
+  for (int i = 0; i < NVMA; i++){
+    if (p->vma[i].maxaddr == 0) 
+      continue;
+    if (p->vma[i].minaddr == addr && p->vma[i].maxaddr == addr + length) {
+      p->vma[i].maxaddr = 0;
+      vma_ind = i;
+    } else if (p->vma[i].minaddr == addr) {
+      p->vma[i].minaddr = addr + length;
+      vma_ind = i;
+    } else if (p->vma[i].maxaddr == addr + length) {
+      p->vma[i].maxaddr = addr;
+      vma_ind = i;
+    }
+  }
+  if (vma_ind < 0) {
+    printf("munmap: couldn't find vma entry\n");
+    return -1;
+  }
+  // Write back to file.
+  if (p->vma[vma_ind].writeback) {
+    struct file* f = p->vma[vma_ind].file;
+    int n = length;
+    uint64 offsetaddr = p->vma[vma_ind].offsetaddr;
+
+    int i = 0;
+    int r = 0;
+    while(i < n){
+      int n1 = n - i;
+      if (n1 > PGROUNDUP(addr + i + 1) - addr - i) // stop at the page boundary 
+        n1 = PGROUNDUP(addr + i + 1) - addr - i;
+
+      // Check if page was put in physical memory. 
+      if (walkaddr(p->pagetable, addr + i) == 0) {
+        r = n1;
+      }
+      else { 
+        // It was put in physical memory, so write it. 
+        begin_op();
+        ilock(f->ip);
+        r = writei(f->ip, 1, addr + i, addr + i - offsetaddr, n1); // changed to use correct offset
+        iunlock(f->ip);
+        end_op();
+      }
+
+      if(r != n1){
+        // error from writei
+        printf("munmap: writei error: %d, %d\n", r, n1);
+        return -1;
+      }
+      i += r;
+    }
+
+    if (i != n) {
+      printf("munmap: filewrite error\n");
+      return -1;
+    }
+  }  
+  // Deallocate physical memory (probably not strictly necessary, but seems optimal.)
+  // uvmdealloc(p->pagetable, PGROUNDUP(addr), PGROUNDDOWN(addr + length));
+  return 0;
+}
+
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
 int
@@ -288,6 +391,14 @@ fork(void)
     return -1;
   }
 
+  // copy the vma
+  for (int i = 0; i < NVMA; i++) {
+    np->vma[i] = p->vma[i];
+    if (np->vma[i].maxaddr != 0) {
+      filedup(np->vma[i].file);
+    }
+  }
+
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -295,6 +406,7 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -321,7 +433,7 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
   release(&np->lock);
-
+  // printf("completed the fork\n");
   return pid;
 }
 
@@ -350,6 +462,13 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  // munmap
+  for (int i = 0; i < NVMA; i++) {
+    if (p->vma[i].maxaddr != 0) {
+      munmap(p->vma[i].minaddr, p->vma[i].maxaddr);
+    }
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

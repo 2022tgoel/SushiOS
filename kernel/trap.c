@@ -5,6 +5,9 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -50,6 +53,7 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
+  int not_ok = 0;
   if(r_scause() == 8){
     // system call
 
@@ -67,7 +71,35 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if(r_scause() == 13 || r_scause() == 15){
+    // load/store page fault. check if memory access is in VMA
+    int mapped_page = 0;
+    uint64 addr = PGROUNDDOWN(r_stval());
+    for (int i = 0; i < NVMA; i++) {
+      if (p->vma[i].minaddr <= addr && addr < p->vma[i].maxaddr) {
+        // in this VMA entry.
+        // map the page to physical memory
+        uint64 newsz = uvmalloc(p->pagetable, addr, addr + PGSIZE, p->vma[i].perm << 1);
+        if (newsz == 0) {
+          panic("mmap: could not allocate memory for mmaped page.");
+        }
+        uint64 map_len = p->vma[i].maxaddr - addr;
+        if (map_len > PGSIZE)
+          map_len = PGSIZE;
+        ilock(p->vma[i].file->ip);
+        readi(p->vma[i].file->ip, 1, addr, addr - p->vma[i].offsetaddr, map_len);
+        iunlock(p->vma[i].file->ip);
+        // read the page from 
+        mapped_page = 1;
+      }
+    }
+    if (!mapped_page) 
+      not_ok = 1;
   } else {
+    not_ok = 1;
+  }
+  
+  if (not_ok) {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);

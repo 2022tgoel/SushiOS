@@ -5,6 +5,10 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "fcntl.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
 
 uint64
 sys_exit(void)
@@ -95,11 +99,38 @@ sys_uptime(void)
 uint64
 sys_mmap(void)
 {
-  return 0;
+  uint64 addr, length;
+  int prot, flags, fd, offset;
+  uint64 res;
+  struct file* f;
+  argaddr(0, &addr);
+  argaddr(1, &length);
+  argint(2, &prot);
+  argint(3, &flags);
+  argint(4, &fd);
+  argint(5, &offset);
+  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    return -1;
+  int writeback = flags & MAP_SHARED;
+  if (!f->writable && (prot & PROT_WRITE) && writeback) // trying to map a non-writeable page as writeable 
+    return -1; 
+  if (addr != 0)
+    panic("mmap: mapping address specified by the user");
+  if (prot & PROT_EXEC)
+    panic("mmap: mapped file has execute permissions");
+  if (offset != 0)
+    panic("mmap: offset is not 0");
+  res = create_vma_entry(length, prot, fd, writeback);
+  if (res == -1)
+    return MAXVA;
+  return res;
 }
 
 uint64
 sys_munmap(void)
 {
-  return 0;
+  uint64 addr, length;
+  argaddr(0, &addr);
+  argaddr(1, &length);
+  return munmap(addr, length);
 }
