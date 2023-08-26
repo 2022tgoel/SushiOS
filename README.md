@@ -1,5 +1,7 @@
 # xv6 labs progress
 
+I'm doing some of the labs from this course: https://pdos.csail.mit.edu/6.828/2022/ for fun. My solutions are in the branches.  
+
 Lab util
 - [x] sleep
 - [x] pingpong
@@ -42,4 +44,4 @@ Lab fs
 - [ ] symbolic links
 
 Lab mmap
-- [ ] implement mmap
+- [x] implement mmap
