@@ -181,6 +181,7 @@ write_log(void)
   int tail;
 
   for (tail = 0; tail < log.lh.n; tail++) {
+    // the next two lines implicitly pick up locks 
     struct buf *to = bread(log.dev, log.start+tail+1); // log block
     struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block
     memmove(to->data, from->data, BSIZE);
@@ -227,8 +228,10 @@ log_write(struct buf *b)
       break;
   }
   log.lh.block[i] = b->blockno;
-  if (i == log.lh.n) {  // Add new block to log?
-    bpin(b);
+  if (i == log.lh.n) {  // Add new block to log
+    bpin(b); // ensure that this block does not get evicted from the cache
+    // Note that this means that all the blocks being written in a log write must reside in the bcache
+    // the log size is set equal to the bcache size, and must by less than or equal in size 
     log.lh.n++;
   }
   release(&log.lock);

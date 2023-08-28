@@ -396,7 +396,8 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
-  if(bn < NINDIRECT){
+  //singly-indirect
+  if(bn < NSINDIRECT){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0){
       addr = balloc(ip->dev);
@@ -410,6 +411,42 @@ bmap(struct inode *ip, uint bn)
       addr = balloc(ip->dev);
       if(addr){
         a[bn] = addr;
+        log_write(bp);
+      }
+    }
+    brelse(bp);
+    return addr;
+  }
+
+  // doubly-indirect
+  if (bn < NINDIRECT) {
+    bn -= NSINDIRECT;
+    int sind = bn / NSINDIRECT;
+    int dind = bn % NSINDIRECT;
+    if((addr = ip->addrs[NDIRECT + 1]) == 0){
+      addr = balloc(ip->dev);
+      if(addr == 0)
+        return 0;
+      ip->addrs[NDIRECT + 1] = addr;
+    }
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[sind]) == 0){
+      addr = balloc(ip->dev);
+      if(addr == 0) {
+        brelse(bp);
+        return 0;
+      }
+      a[sind] = addr;
+      log_write(bp);
+    }
+    brelse(bp);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[dind]) == 0){
+      addr = balloc(ip->dev);
+      if(addr){
+        a[dind] = addr;
         log_write(bp);
       }
     }
@@ -517,13 +554,13 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
     uint addr = bmap(ip, off/BSIZE);
     if(addr == 0)
       break;
-    bp = bread(ip->dev, addr);
+    bp = bread(ip->dev, addr); // get the in-memory buffer that represents this region on disk from the bcache
     m = min(n - tot, BSIZE - off%BSIZE);
-    if(either_copyin(bp->data + (off % BSIZE), user_src, src, m) == -1) {
+    if(either_copyin(bp->data + (off % BSIZE), user_src, src, m) == -1) { // memmove
       brelse(bp);
       break;
     }
-    log_write(bp);
+    log_write(bp); // update the log so that disk is also updated eventually
     brelse(bp);
   }
 
