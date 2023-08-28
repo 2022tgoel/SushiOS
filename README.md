@@ -40,7 +40,7 @@ Lab locks
 - [ ] Buffer cache
 
 Lab fs
-- [ ] large files
+- [x] large files
 - [ ] symbolic links
 
 Lab mmap
