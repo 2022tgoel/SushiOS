@@ -102,12 +102,14 @@ test0()
       printf("chdir failed\n");
       exit(1);
     }
+    // printf("chdir succeeded\n");
     unlink(file);
     createfile(file, N);
     if (chdir("..") < 0) {
       printf("chdir failed\n");
       exit(1);
     }
+    // printf("chdir succeeded\n");
   }
   m = ntas(0);
   for(int i = 0; i < NCHILD; i++){
@@ -117,14 +119,15 @@ test0()
       printf("fork failed");
       exit(-1);
     }
+    // printf("fork succeeded\n");
     if(pid == 0){
       if (chdir(dir) < 0) {
         printf("chdir failed\n");
         exit(1);
       }
-
+      // printf("chdir succeeded\n");
       readfile(file, N*BSIZE, 1);
-
+      // printf("readfile\n");
       exit(0);
     }
   }

@@ -30,12 +30,9 @@ struct mem kmem[NCPU];
 void
 kinit()
 {
-  char name[7];
   uint64 memsz = (PHYSTOP - (uint64) end) / NCPU;
   for (int hart = 0; hart < NCPU; hart++){
-    memset(name, 0, 7);
-    snprintf(name, 7, "kmem %d", hart);
-    initlock(&kmem[hart].lock, name);
+    initlock(&kmem[hart].lock, "kmem");
 
     uint64 startaddr = ((uint64) end + hart*memsz);
     printf("creating freelist starting from: %p and going to: %p\n", startaddr, (startaddr + memsz));
@@ -131,21 +128,21 @@ kalloc(void)
   }
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
-  else {
-    printf("could not allocate page\n");
-    // for (int i = 0; i < NCPU; i++){
-    //   int j = (i + hart) % NCPU;
-    //   printf("trying freelist %d\n", j);
-    //   acquire(&kmem[j].lock);
-    //   r = kmem[j].freelist;
-    //   printf("address of page: %p\n", r);
-    //   if(r)
-    //     kmem[j].freelist = r->next;
-    //   release(&kmem[j].lock);
-    //   if(r)
-    //     break;
-    // }
-  }
+  // else {
+  //   printf("could not allocate page\n");
+  //   // for (int i = 0; i < NCPU; i++){
+  //   //   int j = (i + hart) % NCPU;
+  //   //   printf("trying freelist %d\n", j);
+  //   //   acquire(&kmem[j].lock);
+  //   //   r = kmem[j].freelist;
+  //   //   printf("address of page: %p\n", r);
+  //   //   if(r)
+  //   //     kmem[j].freelist = r->next;
+  //   //   release(&kmem[j].lock);
+  //   //   if(r)
+  //   //     break;
+  //   // }
+  // }
   // printf("giving cpu %d physical mem %p\n", hart, r);
   return (void*)r;
 }
