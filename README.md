@@ -37,7 +37,7 @@ Lab networking
 
 Lab locks
 - [x] Memory allocator
-- [ ] Buffer cache
+- [x] Buffer cache
 
 Lab fs
 - [x] large files
