@@ -102,10 +102,11 @@ bget(uint dev, uint blockno)
     acquire(&bcache.block_locks[no]);
     // acquire(&bcache.lock);
     if(b->refcnt == 0) {
-      b->dev = dev;
-      b->blockno = blockno;
       b->valid = 0;
       b->refcnt = 1;
+      b->dev = dev;
+      b->blockno = blockno;
+      
       // release(&bcache.lock);
       release(&bcache.block_locks[no]);
       acquiresleep(&b->lock);
