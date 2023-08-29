@@ -96,25 +96,27 @@ bget(uint dev, uint blockno)
   // }
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
+  // want to always store locks for the next TWO items
+  // this is to make sure it is actually the next item,
+  // since brelse could change it's location.
+  // acquire(&bcache.block_locks[bcache.head.blockno % NBUCKETS]);
+  // acquire(&bcache.block_locks[bcache.head.prev->blockno % NBUCKETS]);
   for(b = bcache.head.prev; b != &bcache.head; b = b->prev) {
     int no = b->blockno % NBUCKETS;
+    // release(&bcache.block_locks[b->next->blockno % NBUCKETS]);
+    // acquire(&bcache.block_locks[b->prev->blockno % NBUCKETS]);
     acquire(&bcache.block_locks[no]);
-    acquire(&bcache.lock);
     if(b->refcnt == 0) {
       b->dev = dev;
       b->blockno = blockno;
       b->valid = 0;
       b->refcnt = 1;
-      // for (int i = 0; i < NBUCKETS; i++) {
-      //   release(&bcache.block_locks[i]);
-      // }
       release(&bcache.block_locks[no]);
-      release(&bcache.lock);
+      // release(&bcache.block_locks[b->prev->blockno % NBUCKETS]);
       acquiresleep(&b->lock);
       return b;
     }
     release(&bcache.block_locks[no]);
-    release(&bcache.lock);
   }
   panic("bget: no buffers");
 }
@@ -151,9 +153,10 @@ brelse(struct buf *b)
     panic("brelse");
 
   releasesleep(&b->lock);
-
+  int no = b->next->blockno % NBUCKETS;
   acquire(&bcache.block_locks[b->blockno % NBUCKETS]);
-  acquire(&bcache.lock);
+  if (no != b->blockno % NBUCKETS) acquire(&bcache.block_locks[no]);
+  // acquire(&bcache.lock);
   // printf("%d\n", b->blockno % NBUCKETS);
   b->refcnt--;
   if (b->refcnt == 0) {
@@ -166,8 +169,9 @@ brelse(struct buf *b)
     bcache.head.next = b;
     
   }
-  release(&bcache.lock);
+  // release(&bcache.lock);
   release(&bcache.block_locks[b->blockno % NBUCKETS]);
+  if (no != b->blockno % NBUCKETS) release(&bcache.block_locks[no]);
 }
 
 void
