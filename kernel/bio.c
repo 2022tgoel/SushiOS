@@ -68,7 +68,6 @@ bget(uint dev, uint blockno)
 {
   struct buf *b;
 
-  // acquire(&bcache.lock);
   // lock needed for refcount 
   // race condition: 
   // process claims block
@@ -76,9 +75,9 @@ bget(uint dev, uint blockno)
   // also dev/blockno updates can cause race conditions
   // don't want one process to update a buf and other process to not find it 
   acquire(&bcache.block_locks[blockno % NBUCKETS]);
-  // printf("%d\n", blockno % NBUCKETS);
   // Is the block already cached?
-  for(b = bcache.head.next; b != &bcache.head; b = b->next){
+  int i = 0;
+  for(b = bcache.head.next; b != &bcache.head; b = b->next, i++){
     if(b->dev == dev && b->blockno == blockno){
       b->refcnt++;
       release(&bcache.block_locks[blockno % NBUCKETS]);
@@ -86,33 +85,29 @@ bget(uint dev, uint blockno)
       return b;
     }
   }
-
+  if (i < NBUF-1) 
+    panic("bcache linked list got corrupted");
   release(&bcache.block_locks[blockno % NBUCKETS]);
-  // for (int i = 0; i < NBUCKETS; i++) {
-  //   // acquire all the locks.
-  //   // This prevents someone from two processes from claiming
-  //   // a refcount=0 block for themselves
-  //   acquire(&bcache.block_locks[i]);
-  // }
+
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
   // want to always store locks for the next TWO items
   // this is to make sure it is actually the next item,
   // since brelse could change it's location.
-  // acquire(&bcache.block_locks[bcache.head.blockno % NBUCKETS]);
-  // acquire(&bcache.block_locks[bcache.head.prev->blockno % NBUCKETS]);
+  // nvm I'm not doing that 
+  // acquire(&bcache.lock);
   for(b = bcache.head.prev; b != &bcache.head; b = b->prev) {
     int no = b->blockno % NBUCKETS;
-    // release(&bcache.block_locks[b->next->blockno % NBUCKETS]);
-    // acquire(&bcache.block_locks[b->prev->blockno % NBUCKETS]);
+    // release(&bcache.lock);
     acquire(&bcache.block_locks[no]);
+    // acquire(&bcache.lock);
     if(b->refcnt == 0) {
       b->dev = dev;
       b->blockno = blockno;
       b->valid = 0;
       b->refcnt = 1;
+      // release(&bcache.lock);
       release(&bcache.block_locks[no]);
-      // release(&bcache.block_locks[b->prev->blockno % NBUCKETS]);
       acquiresleep(&b->lock);
       return b;
     }
@@ -153,25 +148,27 @@ brelse(struct buf *b)
     panic("brelse");
 
   releasesleep(&b->lock);
-  int no = b->next->blockno % NBUCKETS;
+  
+  
+  
   acquire(&bcache.block_locks[b->blockno % NBUCKETS]);
-  if (no != b->blockno % NBUCKETS) acquire(&bcache.block_locks[no]);
-  // acquire(&bcache.lock);
+  
+  
   // printf("%d\n", b->blockno % NBUCKETS);
   b->refcnt--;
   if (b->refcnt == 0) {
-    // no one is waiting for it.
+    acquire(&bcache.lock);
     b->next->prev = b->prev;
     b->prev->next = b->next;
     b->next = bcache.head.next;
     b->prev = &bcache.head;
     bcache.head.next->prev = b;
     bcache.head.next = b;
-    
+    release(&bcache.lock);
   }
-  // release(&bcache.lock);
+  
   release(&bcache.block_locks[b->blockno % NBUCKETS]);
-  if (no != b->blockno % NBUCKETS) release(&bcache.block_locks[no]);
+  
 }
 
 void
