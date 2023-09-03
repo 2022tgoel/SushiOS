@@ -37,11 +37,11 @@ Lab networking
 
 Lab locks
 - [x] Memory allocator
-- [x] Buffer cache
+- [ ] Buffer cache
 
 Lab fs
 - [x] large files
-- [ ] symbolic links
+- [x] symbolic links
 
 Lab mmap
 - [x] implement mmap
