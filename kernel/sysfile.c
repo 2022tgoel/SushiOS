@@ -248,12 +248,11 @@ create(char *path, short type, short major, short minor)
   struct inode *ip, *dp;
   char name[DIRSIZ];
 
-  if((dp = nameiparent(path, name)) == 0)
+  if((dp = nameiparent(path, name)) == 0) // get direct parent, put new file in name
     return 0;
 
   ilock(dp);
-
-  if((ip = dirlookup(dp, name, 0)) != 0){
+  if((ip = dirlookup(dp, name, 0)) != 0){ // already exists
     iunlockput(dp);
     ilock(ip);
     if(type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE))
@@ -261,7 +260,6 @@ create(char *path, short type, short major, short minor)
     iunlockput(ip);
     return 0;
   }
-
   if((ip = ialloc(dp->dev, type)) == 0){
     iunlockput(dp);
     return 0;
@@ -311,11 +309,11 @@ sys_open(void)
   int n;
 
   argint(1, &omode);
-  if((n = argstr(0, path, MAXPATH)) < 0)
+  if((n = argstr(0, path, MAXPATH)) < 0) {
+    printf("here fail\n");
     return -1;
-
+  }
   begin_op();
-
   if(omode & O_CREATE){
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
@@ -333,6 +331,33 @@ sys_open(void)
       end_op();
       return -1;
     }
+    for (int i = 0; i < 10; i++) {
+      if (omode & O_NOFOLLOW)
+        break;
+      if (ip->type == T_SYMLINK) { // follow the link
+        struct syment se; 
+        if (readi(ip, 0, (uint64)&se, 0, sizeof(se)) != sizeof(se)) {
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        struct inode* nextip = namei(se.name);
+        if (nextip == 0) {
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        iunlockput(ip);
+        ip = nextip;
+        ilock(ip);
+      }
+      if (i == 9 && (ip->type == T_SYMLINK)) {
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+    }
+    
   }
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
@@ -368,6 +393,39 @@ sys_open(void)
   end_op();
 
   return fd;
+}
+
+uint64 
+sys_symlink(void) {
+  char target[MAXPATH];
+  char path[MAXPATH];
+  struct inode *ip;
+  int n;
+
+  if((n = argstr(0, target, MAXPATH)) < 0)
+    return -1;
+
+  if((n = argstr(1, path, MAXPATH)) < 0)
+      return -1;
+
+  begin_op();
+
+  ip = create(path, T_SYMLINK, 0, 0);
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+  
+  if (symlink(ip, target) < 0) { ;
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  iunlockput(ip);
+  end_op();
+  printf("finish creating symlink: %s links to %s\n", path, target);
+  return 0;
 }
 
 uint64
@@ -503,3 +561,4 @@ sys_pipe(void)
   }
   return 0;
 }
+

@@ -41,6 +41,7 @@ struct inode*   dirlookup(struct inode*, char*, uint*);
 struct inode*   ialloc(uint, short);
 struct inode*   idup(struct inode*);
 void            iinit();
+struct inode*   iget(uint, uint);
 void            ilock(struct inode*);
 void            iput(struct inode*);
 void            iunlock(struct inode*);
@@ -53,7 +54,7 @@ int             readi(struct inode*, int, uint64, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, int, uint64, uint, uint);
 void            itrunc(struct inode*);
-
+int             symlink(struct inode*, char*);
 // ramdisk.c
 void            ramdiskinit(void);
 void            ramdiskintr(void);

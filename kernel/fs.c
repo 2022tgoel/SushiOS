@@ -189,7 +189,7 @@ iinit()
   }
 }
 
-static struct inode* iget(uint dev, uint inum);
+// static struct inode* iget(uint dev, uint inum);
 
 // Allocate an inode on device dev.
 // Mark it as allocated by  giving it type type.
@@ -243,7 +243,7 @@ iupdate(struct inode *ip)
 // Find the inode with number inum on device dev
 // and return the in-memory copy. Does not lock
 // the inode and does not read it from disk.
-static struct inode*
+struct inode*
 iget(uint dev, uint inum)
 {
   struct inode *ip, *empty;
@@ -642,6 +642,18 @@ dirlink(struct inode *dp, char *name, uint inum)
   return 0;
 }
 
+
+int
+symlink(struct inode *dp, char *path)
+{
+  struct syment se;
+
+  strncpy(se.name, path, MAXPATH);
+  if(writei(dp, 0, (uint64)&se, 0, sizeof(se)) != sizeof(se))
+    return -1;
+
+  return 0;
+}
 // Paths
 
 // Copy the next path element from path into name.
