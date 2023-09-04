@@ -6,7 +6,7 @@ Lab util
 - [x] sleep
 - [x] pingpong
 - [x] primes
-- [ ] find
+- [x] find
 - [ ] xargs
 
 Lab syscall
