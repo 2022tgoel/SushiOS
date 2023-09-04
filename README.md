@@ -7,7 +7,7 @@ Lab util
 - [x] pingpong
 - [x] primes
 - [x] find
-- [ ] xargs
+- [x] xargs
 
 Lab syscall
 - [ ] Using gdb
